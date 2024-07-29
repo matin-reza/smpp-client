@@ -38,10 +38,8 @@ public class SMPPReceiver implements Runnable {
                         System.out.println("Received delivery report for message ID: " + deliverSM.getReceiptedMessageId());
                         // Respond to the delivery report
                         DeliverSMResp deliverSMResp = new DeliverSMResp();
+                        deliverSMResp.setSequenceNumber(deliverSM.getSequenceNumber());
                         session.respond(deliverSMResp);
-                    } else if (pdu instanceof EnquireLink) {
-                        EnquireLinkResp enquireLinkResp = new EnquireLinkResp();
-                        session.respond(enquireLinkResp);
                     }
                 }
             } else {
