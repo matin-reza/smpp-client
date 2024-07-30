@@ -20,13 +20,11 @@ public class SMPPClient {
         return sms.matches("^[0-9A-F]+$");
     }
 
-    private Encoding getCharset(byte[] text) throws UnsupportedEncodingException {
-        String content;
+    private Encoding getCharset(String content) throws UnsupportedEncodingException {
         Encoding result = null;
         String ASCIIChecked;
         String UTF8Checked;
         String UTF_8 = "UTF-8";
-        content = new String(text, UTF_8);
         Charset ASCIICharset = new SCGSMCharset();
         Charset UTF8Charset = Charset.forName(UTF_8);
         ASCIIChecked = new String(content.getBytes(ASCIICharset), ASCIICharset);
@@ -51,21 +49,29 @@ public class SMPPClient {
         return GsmUtil.createConcatenatedBinaryShortMessages(message, (byte) refNum);
     }
 
-    private SubmitSM prepareSubmitSM(byte dataCoding, String originator, String number) throws WrongLengthOfStringException {
+    private Address prepareAddress(String number) throws WrongLengthOfStringException {
+        Address address = new Address(number);
+        address.setNpi((byte) 1);
+        address.setTon((byte) 1);
+        return address;
+    }
+
+    private SubmitSM prepareSubmitSM(byte[] messageByte, byte dataCoding, String originator, String number) throws PDUException, NotEnoughDataInByteBufferException, TerminatingZeroNotFoundException {
         SubmitSM submit = new SubmitSM();
-        submit.setSourceAddr(new Address(originator));
-        submit.setDestAddr(new Address(number));
+        submit.setSourceAddr(prepareAddress(originator));
+        submit.setDestAddr(prepareAddress(number));
         submit.setDataCoding(dataCoding);
         submit.setRegisteredDelivery((byte) 0);
+        ByteBuffer sms = new ByteBuffer();
+        sms.setBuffer(messageByte);
+        submit.setShortMessageData(sms);
         return submit;
     }
 
     private void sendParts(byte[][] parts, byte dataCoding, Session session, String originator, String number) throws PDUException, NotEnoughDataInByteBufferException, TerminatingZeroNotFoundException, WrongSessionStateException, IOException, TimeoutException {
         for (byte[] part : parts) {
-            SubmitSM submit = prepareSubmitSM(dataCoding, originator, number);
-            ByteBuffer sms = new ByteBuffer();
-            sms.setBuffer(part);
-            submit.setShortMessageData(sms);
+            SubmitSM submit = prepareSubmitSM(part, dataCoding, originator, number);
+            submit.setEsmClass((byte) 64);
             SubmitSMResp submitResponse = session.submit(submit);
             if (submitResponse.getCommandStatus() == Data.ESME_ROK) {
                 System.out.println("Message sent successfully!");
@@ -75,9 +81,8 @@ public class SMPPClient {
         }
     }
 
-    private void sendSimple(String messageText, byte dataCoding, Session session, String originator, String number) throws WrongSessionStateException, PDUException, IOException, TimeoutException {
-        SubmitSM submit = prepareSubmitSM(dataCoding, originator, number);
-        submit.setShortMessage(messageText);
+    private void sendSimple(byte[] messageByte, byte dataCoding, Session session, String originator, String number) throws WrongSessionStateException, PDUException, IOException, TimeoutException, NotEnoughDataInByteBufferException, TerminatingZeroNotFoundException {
+        SubmitSM submit = prepareSubmitSM(messageByte, dataCoding, originator, number);
         SubmitSMResp submitResponse = session.submit(submit);
         if (submitResponse.getCommandStatus() == Data.ESME_ROK) {
             System.out.println("Message sent successfully!" + submitResponse.getMessageId());
@@ -88,21 +93,22 @@ public class SMPPClient {
 
     private void sendMessage(String smppServer, int smppPort, String systemId, String password) throws UnsupportedEncodingException {
         byte dataCoding;
-        String sourceAddress = "+9850004343"; // Replace with your source address
-        String destinationAddress = "+989128206212"; // Replace with the destination address
-        //String messageText = "سaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"; // Replace with your message text
-        String messageText = "test"; // Replace with your message text
+        String sourceAddress = "your source"; // Replace with your source address
+        String destinationAddress = "your des"; // Replace with the destination address
+        String messageText = "salam"; // Replace with your message text
         int contentBitsLen;
-        byte[] messageByte = messageText.getBytes(StandardCharsets.UTF_8);
+        byte[] messageByte;
 
-        Encoding encoding = getCharset(messageByte);
+        Encoding encoding = getCharset(messageText);
 
 
         if (encoding.equals(Encoding.ASCII)) {
             dataCoding = 0x00; // GSM 7-bit
+            messageByte = messageText.getBytes();
             contentBitsLen = messageByte.length * 7;
         } else {
             dataCoding = 0x08; // UCS-2
+            messageByte = messageText.getBytes(StandardCharsets.UTF_16BE);
             contentBitsLen = messageByte.length * 16;
         }
 
@@ -113,7 +119,6 @@ public class SMPPClient {
             BindRequest bindRequest = new BindTransmitter();
             bindRequest.setSystemId(systemId);
             bindRequest.setPassword(password);
-
             BindResponse bindResponse = session.bind(bindRequest);
 
             if (bindResponse.getCommandStatus() == Data.ESME_ROK) {
@@ -121,7 +126,7 @@ public class SMPPClient {
                     byte[][] parts = splitIntoParts(messageByte);
                     sendParts(parts, dataCoding, session, sourceAddress, destinationAddress);
                 } else
-                    sendSimple(messageText, dataCoding, session, sourceAddress, destinationAddress);
+                    sendSimple(messageByte, dataCoding, session, sourceAddress, destinationAddress);
             } else {
                 System.err.println("Failed to bind to SMPP server: " + bindResponse.getCommandStatus());
             }
@@ -147,7 +152,7 @@ public class SMPPClient {
         SMPPClient client = new SMPPClient();
         SMPPReceiver receiver = new SMPPReceiver(smppServer, smppPort, systemId, password);
         Thread t = new Thread(receiver);
-        t.start();
+        //t.start();
 
         client.sendMessage(smppServer, smppPort, systemId, password);
     }
