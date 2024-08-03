@@ -13,11 +13,6 @@
     <url>http://maven.apache.org</url>
     <dependencies>
         <dependency>
-            <groupId>org.opensmpp</groupId>
-            <artifactId>opensmpp-core</artifactId>
-            <version>3.0.2</version>
-        </dependency>
-        <dependency>
             <groupId>net.freeutils</groupId>
             <artifactId>jcharset</artifactId>
             <version>1.5</version>
@@ -27,7 +22,11 @@
             <artifactId>ch-commons-gsm</artifactId>
             <version>3.0.0</version>
         </dependency>
-
+        <dependency>
+            <groupId>org.jsmpp</groupId>
+            <artifactId>jsmpp</artifactId>
+            <version>3.0.1</version>
+        </dependency>
     </dependencies>
     <build>
         <finalName>smpp-sample</finalName>
